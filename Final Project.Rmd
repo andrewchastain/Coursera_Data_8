@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Executive Summary
 
-An analysis of the Human Activity Recognition, Weight Lifting Exercise dataset was undertaken to create a predictive machine learning model. The training dataset was broken into building and validation subsets that were used to construct models using linear discriminant analysis (`lda`), a classification tree (`rpart`), a random forest (`randomForest`) and gradient boosting model (`gbm`). The methods were run without tuning. The random forest had the highest accuracy (99.6%) on the validation subset and was chosen for the final model. The model was rebuilt using the full training set before being run on the 20 testing examples, for which all 20 were correctly classified. 
+An analysis of the Human Activity Recognition, Weight Lifting Exercise dataset was undertaken to create a predictive machine learning model. The training dataset was broken into building and validation subsets that were used to construct models using linear discriminant analysis (`lda`), a classification tree (`rpart`), a random forest (`randomForest`) and gradient boosting model (`gbm`). The methods were run without tuning. The random forest had the highest accuracy (99.4%) on the validation subset and was chosen for the final model. The model was rebuilt using the full training set before being run on the 20 testing examples, for which all 20 were correctly classified. 
 
 ## Loading the data and necessary libraries
 
