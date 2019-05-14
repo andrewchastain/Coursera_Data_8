@@ -1,0 +1,140 @@
+---
+title: "Practical Machine Learning Final Project"
+author: "Andrew Chastain"
+date: "5/14/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Executive Summary
+
+An analysis of the Human Activity Recognition, Weight Lifting Exercise dataset was undertaken to create a predictive machine learning model. The training dataset was broken into building and validation subsets that were used to construct models using linear discriminant analysis (`lda`), a classification tree (`rpart`), a random forest (`randomForest`) and gradient boosting model (`gbm`). The methods were run without tuning. The random forest had the highest accuracy (99.6%) on the validation subset and was chosen for the final model. The model was rebuilt using the full training set before being run on the 20 testing examples, for which all 20 were correctly classified. 
+
+## Loading the data and necessary libraries
+
+```{r init, results='hide', message=FALSE, warning=FALSE}
+library(tidyverse);library(caret);library(randomForest)
+set.seed(61231)
+```
+
+`tidyverse`, `caret` and `randomForest` packages were used for this analysis. The data were downloaded as a training set and a 20-row testing set. Some rows had "#DIV/0!" values where numbers were expected, so those were converted to "NA" values.  
+
+```{r download, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
+trainURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+if(!file.exists("./pml-training.csv")){
+    download.file(trainURL, destfile = "./pml-training.csv")
+}
+if(!file.exists("./pml-testing.csv")){
+    download.file(testURL, destfile = "./pml-testing.csv")
+}
+
+training <- read_delim("./pml-training.csv", delim = ",",
+                       na = c("", "NA", "#DIV/0!"),
+                       col_types = cols())
+testing <- read_delim("./pml-testing.csv", delim = ",",
+                       na = c("", "NA", "#DIV/0!"),
+                       col_types = cols())
+```
+
+## Exploratory Data Analysis
+
+The first thing that was examined was the structure of the training data. `classe` was the outcome variable, while the first eight columns provided descriptors for the observations. The remaining variables were the predictors, representing different motion characteristics for a set of sensors.  
+
+```{r eda1}
+table(training$classe)
+table(is.na(training))
+```  
+
+The first table indicated that the success class, A, has about twice as many values as the four failure classes, B-E. The second table indicated that there were a similar number of NA values to non-NA, which was unexpected. The NAs per row were counted and displayed in a histogram.  
+
+```{r hist, fig.dim=c(7,5)}
+hist(rowSums(is.na(training)),
+     main = "Histogram of NAs by row",
+     xlab = "Columns")
+```  
+
+The distribution indicated a very small number of rows with a few NA values, with most of the NAs existing in 100 columns. This suggested that the NAs were structural and not missing data. Looking at the rows with fewer NAs, it was clear that rows where `new_window` was "yes" contained extra calculated values in those hundred extra columns. Those calculated columns were excluded from the training and testing sets, and `classe` was converted to a factor.  
+
+```{r subsetting, echo=FALSE}
+trainsub <- training[,as.vector(!is.na(training[1,]))]
+testsub <- testing[,as.vector(!is.na(training[1,]))]
+trainsub$classe <- as.factor(trainsub$classe)
+```  
+
+The `trainsub` data was then split into a building and validation set to run through a series of standard machine learning algorithms to see which had the highest accuracy.
+
+```{r splitting, echo=FALSE}
+inBuild <- createDataPartition(trainsub$classe,
+                               p = 0.75,
+                               list = FALSE)
+building <- trainsub[inBuild,]; validation <- trainsub[-inBuild,]
+```
+
+## Model Building
+
+The first seven columns were excluded from the training data, as there was some structure to those data that would have interfered with model construction. The validation set was used to compare and cross-validate the different models. 
+
+### Linear Discriminant Analysis  
+
+```{r lda, cache=TRUE}
+# Model 1, LDA
+mod1 <- train(classe ~ ., data = building[,-(1:7)],
+              method = "lda")
+pred1 <- predict(mod1, validation[,-(1:7)])
+confusionMatrix(pred1, validation$classe)$overall[1]
+```  
+
+### Classification Tree with rpart
+
+```{r rpart, cache=TRUE}
+# Model 2, rpart tree
+mod2 <- train(classe ~ ., data = building[,-(1:7)],
+              method = "rpart")
+pred2 <- predict(mod2, validation[,-(1:7)])
+confusionMatrix(pred2, validation$classe)$overall[1]
+```  
+
+### Random Forest
+
+```{r randomForest, cache=TRUE}
+# Model 3, randomForest
+predictors <- building[,c(-(1:7),-60)]
+outcomes <- building[,60]
+outcomes$classe <- as.factor(outcomes$classe)
+mod3 <- randomForest(x = predictors,
+                     y = outcomes$classe)
+pred3 <- predict(mod3, validation[,-(1:7)])
+confusionMatrix(pred3, validation$classe)$overall[1]
+```
+
+### Gradient Boosted Modeling
+
+```{r gbm, cache=TRUE, warning=FALSE}
+# Model 4, gradient boosted regression model
+mod4 <- train(x = predictors,
+              y = outcomes$classe,
+              method = "gbm",
+              verbose = FALSE)
+pred4 <- predict(mod4, validation)
+confusionMatrix(pred4, validation$classe)$overall[1]
+```  
+
+## Rebuilding Final Model
+
+The randomForest algorithm had the highest accuracy on the testing subset. The randomForest model was then rebuilt using the full training set from the HAR-WLE dataset and validated using the pml-testing.csv data.  
+
+```{r rf2, cache=TRUE}
+predictors2 <- trainsub[,c(-(1:7),-60)]
+outcomes2 <- trainsub[,60]
+outcomes2$classe <- as.factor(outcomes2$classe)
+modFinal <- randomForest(x = predictors2,
+                         y = outcomes2$classe)
+predFinal <- predict(modFinal, testsub[,-(1:7)])
+print(predFinal)
+```  
+
